@@ -12,6 +12,7 @@ import {
   Keyboard
 } from 'react-native';
 import VideoPlayer from 'react-native-video-controls';
+
 const { RecorderManager } = NativeModules;
 
 export default class App extends React.Component {
@@ -59,15 +60,19 @@ export default class App extends React.Component {
       case 'ios':
         CameraRoll.getPhotos({
           first: 1,
-          assetType: 'Videos'
+          assetType: 'Videos',
+          groupTypes: 'All'
         }).then(r => {
           if (r.edges.length > 0) {
-            const video = r.edges[0].node.image;
+            const ext = 'mp4'
+            const appleId = r.edges[0].node.image.uri.substring(5, 41);
+            const video = `assets-library://asset/asset.${ext}?id=${appleId}&ext=${ext}`;
+            console.log(video)
             this.setState({
-              videoUri: video.uri,
+              videoUri: video,
               disableStart: true,
               disableStopped: true,
-              disablePlayable: true,
+              disablePlayable: true
             })
           }
         });
@@ -116,6 +121,7 @@ export default class App extends React.Component {
   }
 
   componentDidMount () {
+    this.getTheDamnVideo();
     this.keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', this.keyboardDidShow);
     this.keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', this.keyboardDidHide);
   }
@@ -154,6 +160,8 @@ export default class App extends React.Component {
     );
   }
 }
+
+
 
 const styles = StyleSheet.create({
   container: {

@@ -162,7 +162,8 @@
 
 - (NSURL*)tempFileURL
 {
-    NSString *outputPath = [NSHomeDirectory() stringByAppendingPathComponent:@"tmp/screenCapture.mp4"];
+    NSString *outputPath = [NSHomeDirectory() stringByAppendingPathComponent:@"/tmp/screenCapture.mp4"];
+
     [self removeTempFilePath:outputPath];
     return [NSURL fileURLWithPath:outputPath];
 }
