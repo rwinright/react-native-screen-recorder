@@ -419,7 +419,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				27C97728231594E40003ECFD /* JavaScriptCore.framework in Frameworks */,
 				5E03BF0220C199340061BDA6 /* libRCTCameraRoll.a in Frameworks */,
 				ADBDB9381DFEBF1600ED6528 /* libRCTBlob.a in Frameworks */,
 				5E9157361DD0AC6A00FF2AA8 /* libRCTAnimation.a in Frameworks */,
@@ -437,6 +436,7 @@
 				BBE9C91F05324D23B9BE2841 /* libRCTVideo.a in Frameworks */,
 				3DDD2C312B274747B3888BF6 /* libRNFetchBlob.a in Frameworks */,
 				4AB1ABF604E94062A976F734 /* libRNFS.a in Frameworks */,
+				27C97728231594E40003ECFD /* JavaScriptCore.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1267,7 +1267,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "export NODE_BINARY=/usr/bin/node6\nexport LOGGING_LEVEL=4\nexport DEVELOPMENT_BUILD_CONFIGURATIONS=\"+(Staging|Preflight|Debug)\"\n$NODE_BINARY ../node_modules/@sentry/cli/bin/sentry-cli react-native xcode ../node_modules/react-native-schemes-manager/lib/react-native-xcode.sh";
+			shellScript = "export NODE_BINARY=node\n../node_modules/react-native/scripts/react-native-xcode.sh\n";
 		};
 		2D02E4CB1E0B4B27006451C7 /* Bundle React Native Code And Images */ = {
 			isa = PBXShellScriptBuildPhase;
