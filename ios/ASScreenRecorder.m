@@ -104,7 +104,7 @@
     
     NSDictionary *bufferAttributes = @{(id)kCVPixelBufferPixelFormatTypeKey : @(kCVPixelFormatType_32BGRA),
                                        (id)kCVPixelBufferCGBitmapContextCompatibilityKey : @YES,
-                                       (id)kCVPixelBufferWidthKey : @(_viewSize.width * _scale),
+                                        (id)kCVPixelBufferWidthKey : @(_viewSize.width * _scale),
                                        (id)kCVPixelBufferHeightKey : @(_viewSize.height * _scale),
                                        (id)kCVPixelBufferBytesPerRowAlignmentKey : @(_viewSize.width * _scale * 4)
                                        };
@@ -115,7 +115,7 @@
     
     NSError* error = nil;
     _videoWriter = [[AVAssetWriter alloc] initWithURL:self.videoURL ?: [self tempFileURL]
-                                             fileType:AVFileTypeQuickTimeMovie
+                                             fileType:AVFileTypeMPEG4
                                                 error:&error];
     NSParameterAssert(_videoWriter);
     
