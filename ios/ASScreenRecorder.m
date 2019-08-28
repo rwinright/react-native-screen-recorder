@@ -12,14 +12,31 @@
 #import <AssetsLibrary/AssetsLibrary.h>
 #import <UIKit/UIKit.h>
 
-@interface ASScreenRecorder()
+#define SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(v)  ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] != NSOrderedAscending)
+#define SYSTEM_VERSION_LESS_THAN(v)                 ([[[UIDevice currentDevice] systemVersion] compare:v options:NSNumericSearch] == NSOrderedAscending)
+
+@interface ASScreenRecorder()<AVCaptureAudioDataOutputSampleBufferDelegate>
+
 @property (strong, nonatomic) AVAssetWriter *videoWriter;
 @property (strong, nonatomic) AVAssetWriterInput *videoWriterInput;
 @property (strong, nonatomic) AVAssetWriterInputPixelBufferAdaptor *avAdaptor;
 @property (strong, nonatomic) CADisplayLink *displayLink;
 @property (strong, nonatomic) NSDictionary *outputBufferPoolAuxAttributes;
+
+@property (nonatomic) AVCaptureDeviceInput *audioCaptureInput;
+@property (nonatomic) AVAssetWriterInput *audioInput;
+@property (nonatomic) AVCaptureAudioDataOutput *audioCaptureOutput;
+@property (nonatomic) AVCaptureSession *captureSession;
+@property (nonatomic) NSDictionary *audioSettings;
+@property (nonatomic) CMTime firstAudioTimeStamp;
+@property (nonatomic) NSDate *startedAt;
+
 @property (nonatomic) CFTimeInterval firstTimeStamp;
 @property (nonatomic) BOOL isRecording;
+
+@property (nonatomic) bool stopRequested;
+@property (strong, nonatomic) NSMutableArray *pauseResumeTimeRanges;
+
 @end
 
 @implementation ASScreenRecorder
@@ -58,12 +75,14 @@
             _scale = 1.0;
         }
         _isRecording = NO;
-        
+        _stopRequested = NO;
         _append_pixelBuffer_queue = dispatch_queue_create("ASScreenRecorder.append_queue", DISPATCH_QUEUE_SERIAL);
         _render_queue = dispatch_queue_create("ASScreenRecorder.render_queue", DISPATCH_QUEUE_SERIAL);
         dispatch_set_target_queue(_render_queue, dispatch_get_global_queue( DISPATCH_QUEUE_PRIORITY_HIGH, 0));
         _frameRenderingSemaphore = dispatch_semaphore_create(1);
         _pixelAppendSemaphore = dispatch_semaphore_create(1);
+        _fps = 60;
+        [self setUpAudioCapture];
     }
     return self;
 }
@@ -82,18 +101,51 @@
         [self setUpWriter];
         _isRecording = (_videoWriter.status == AVAssetWriterStatusWriting);
         _displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(writeVideoFrame)];
+        _displayLink.frameInterval = 60 / self.fps;
         [_displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
     }
     return _isRecording;
+}
+
+- (void)pauseRecording
+{
+    if (_displayLink.paused) {
+      return;
+    }
+
+    if (!self.pauseResumeTimeRanges) {
+      self.pauseResumeTimeRanges = [NSMutableArray new];
+    }
+
+    [self.pauseResumeTimeRanges addObject:@(_displayLink.timestamp + 0.001)]; //adding a small delay
+
+    _displayLink.paused = YES;
+  }
+  - (void)resumeRecording
+  {
+    if (_displayLink && _displayLink.isPaused) {
+      _displayLink.paused = NO;
+    }
 }
 
 - (void)stopRecordingWithCompletion:(VideoCompletionBlock)completionBlock;
 {
     if (_isRecording) {
         _isRecording = NO;
+        _stopRequested = YES;
         [_displayLink removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
         [self completeRecordingSession:completionBlock];
+        self.pauseResumeTimeRanges = nil;
     }
+}
+
+- (BOOL)isPaused
+{
+  return _displayLink.paused;
+}
+- (void)setPaused:(BOOL)paused
+{
+  [self pauseRecording];
 }
 
 #pragma mark - private
@@ -136,9 +188,18 @@
     _avAdaptor = [AVAssetWriterInputPixelBufferAdaptor assetWriterInputPixelBufferAdaptorWithAssetWriterInput:_videoWriterInput sourcePixelBufferAttributes:nil];
     
     [_videoWriter addInput:_videoWriterInput];
+  
+    NSLog(@"assetWriterInputWithMediaType audio");
+    _audioInput = [AVAssetWriterInput assetWriterInputWithMediaType:AVMediaTypeAudio outputSettings:_audioSettings];
+    _audioInput.expectsMediaDataInRealTime = YES;
+  
+    NSLog(@"canAddInput audio");
+    NSParameterAssert([_videoWriter canAddInput:_audioInput]);
+    [_videoWriter addInput:_audioInput];
     
     [_videoWriter startWriting];
-    [_videoWriter startSessionAtSourceTime:CMTimeMake(0, 1000)];
+    float millisElapsed = [[NSDate date] timeIntervalSinceDate:_startedAt] * 1000.0;
+    [_videoWriter startSessionAtSourceTime:CMTimeAdd(_firstAudioTimeStamp, CMTimeMake(millisElapsed, 1000.0f))];
 }
 
 - (CGAffineTransform)videoTransformForDeviceOrientation
@@ -162,7 +223,7 @@
 
 - (NSURL*)tempFileURL
 {
-    NSString *outputPath = [NSHomeDirectory() stringByAppendingPathComponent:@"/tmp/screenCapture.mp4"];
+    NSString *outputPath = [NSHomeDirectory() stringByAppendingPathComponent:@"tmp/screenCapture.mp4"];
 
     [self removeTempFilePath:outputPath];
     return [NSURL fileURLWithPath:outputPath];
@@ -232,25 +293,46 @@
     }
     dispatch_async(_render_queue, ^{
         if (![_videoWriterInput isReadyForMoreMediaData]) return;
-        
+
+        if (self.pauseResumeTimeRanges.count % 2 != 0) {
+          [self.pauseResumeTimeRanges addObject:@(_displayLink.timestamp)];
+        }
+      
         if (!self.firstTimeStamp) {
             self.firstTimeStamp = _displayLink.timestamp;
         }
-        CFTimeInterval elapsed = (_displayLink.timestamp - self.firstTimeStamp);
+      
+        CFTimeInterval elapsed = [[NSDate date] timeIntervalSinceDate:_startedAt] * 1000.0;
+        if (self.pauseResumeTimeRanges.count) {
+          for (int i = 0; i < self.pauseResumeTimeRanges.count; i += 2) {
+            double pausedTime = [self.pauseResumeTimeRanges[i] doubleValue];
+            double resumeTime = [self.pauseResumeTimeRanges[i+1] doubleValue];
+            elapsed -= resumeTime - pausedTime;
+          }
+        }
+      
         CMTime time = CMTimeMakeWithSeconds(elapsed, 1000);
-        
+      
         CVPixelBufferRef pixelBuffer = NULL;
         CGContextRef bitmapContext = [self createPixelBufferAndBitmapContext:&pixelBuffer];
         
         if (self.delegate) {
             [self.delegate writeBackgroundFrameInContext:&bitmapContext];
         }
+      
+        CGFloat width = _viewSize.width;
+        CGFloat height = _viewSize.height;
+        if(SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"8") && UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation)) {
+          width  = MAX(_viewSize.width, _viewSize.height);
+          height = MIN(_viewSize.width, _viewSize.height);
+        }
+      
         // draw each window into the context (other windows include UIKeyboard, UIAlert)
         // FIX: UIKeyboard is currently only rendered correctly in portrait orientation
         dispatch_sync(dispatch_get_main_queue(), ^{
             UIGraphicsPushContext(bitmapContext); {
                 for (UIWindow *window in [[UIApplication sharedApplication] windows]) {
-                    [window drawViewHierarchyInRect:CGRectMake(0, 0, _viewSize.width, _viewSize.height) afterScreenUpdates:NO];
+                    [window drawViewHierarchyInRect:CGRectMake(0, 0, width, height) afterScreenUpdates:NO];
                 }
             } UIGraphicsPopContext();
         });
@@ -296,8 +378,98 @@
     CGContextScaleCTM(bitmapContext, _scale, _scale);
     CGAffineTransform flipVertical = CGAffineTransformMake(1, 0, 0, -1, 0, _viewSize.height);
     CGContextConcatCTM(bitmapContext, flipVertical);
+  
+    if(SYSTEM_VERSION_GREATER_THAN_OR_EQUAL_TO(@"8") && UIInterfaceOrientationIsLandscape([UIApplication sharedApplication].statusBarOrientation)) {
+      CGContextRotateCTM(bitmapContext, M_PI_2);
+      CGContextTranslateCTM(bitmapContext, 0, -_viewSize.width);
+    }
+    if(SYSTEM_VERSION_LESS_THAN(@"8") && [UIApplication sharedApplication].statusBarOrientation == UIInterfaceOrientationLandscapeLeft) {
+      CGContextRotateCTM(bitmapContext, M_PI);
+    }
     
     return bitmapContext;
+}
+
+# pragma mark - audio recording
+- (void) setUpAudioCapture
+{
+  NSError *error;
+  
+  AVCaptureDevice *device = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+  if (device && device.connected)
+    NSLog(@"Connected Device: %@", device.localizedName);
+  else
+  {
+    NSLog(@"AVCaptureDevice Failed");
+    return;
+  }
+  
+  // add device inputs
+  _audioCaptureInput = [AVCaptureDeviceInput deviceInputWithDevice:device error:&error];
+  if (!_audioCaptureInput)
+  {
+    NSLog(@"AVCaptureDeviceInput Failed");
+    return;
+  }
+  if (error)
+  {
+    NSLog(@"%@", error);
+    return;
+  }
+  
+  // add output for audio
+  _audioCaptureOutput = [[AVCaptureAudioDataOutput alloc] init];
+  if (!_audioCaptureOutput)
+  {
+    NSLog(@"AVCaptureMovieFileOutput Failed");
+    return;
+  }
+  dispatch_queue_t audioCaptureQueue = dispatch_queue_create("AudioCaptureQueue", NULL);
+  [_audioCaptureOutput setSampleBufferDelegate:self queue:audioCaptureQueue];
+  
+  _captureSession = [[AVCaptureSession alloc] init];
+  if (!_captureSession)
+  {
+    NSLog(@"AVCaptureSession Failed");
+    return;
+  }
+  _captureSession.sessionPreset = AVCaptureSessionPresetMedium;
+  if ([_captureSession canAddInput:_audioCaptureInput])
+    [_captureSession addInput:_audioCaptureInput];
+  else
+  {
+    NSLog(@"Failed to add input device to capture session");
+    return;
+  }
+  if ([_captureSession canAddOutput:_audioCaptureOutput])
+    [_captureSession addOutput:_audioCaptureOutput];
+  else
+  {
+    NSLog(@"Failed to add output device to capture session");
+    return;
+  }
+  
+  _audioSettings = [_audioCaptureOutput recommendedAudioSettingsForAssetWriterWithOutputFileType:AVFileTypeMPEG4];
+  
+  [_captureSession startRunning];
+  
+  NSLog(@"Audio capture session running");
+}
+- (void)captureOutput:(AVCaptureOutput *)captureOutput didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer fromConnection:(AVCaptureConnection *)connection
+{
+  if (captureOutput == _audioCaptureOutput)
+  {
+    if (_startedAt == nil)
+    {
+      _startedAt = [NSDate date];
+      _firstAudioTimeStamp = CMSampleBufferGetPresentationTimeStamp(sampleBuffer);
+    }
+    
+    if (_isRecording && !_stopRequested && [_audioInput isReadyForMoreMediaData])
+    {
+      [_audioInput appendSampleBuffer:sampleBuffer];
+    }
+  }
 }
 
 @end

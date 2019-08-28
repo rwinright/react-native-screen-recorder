@@ -8,6 +8,7 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
+
 typedef void (^VideoCompletionBlock)(void);
 @protocol ASScreenRecorderDelegate;
 
@@ -21,8 +22,13 @@ typedef void (^VideoCompletionBlock)(void);
 // this property can not be changed whilst recording is in progress
 @property (strong, nonatomic) NSURL *videoURL;
 
+  @property (nonatomic, getter = isPaused) BOOL paused;
+  @property (nonatomic) NSInteger fps;
+
 + (instancetype)sharedInstance;
 - (BOOL)startRecording;
+- (void)pauseRecording;
+- (void)resumeRecording;
 - (void)stopRecordingWithCompletion:(VideoCompletionBlock)completionBlock;
 @end
 
