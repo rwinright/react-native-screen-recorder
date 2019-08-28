@@ -121,7 +121,6 @@ export default class App extends React.Component {
   }
 
   componentDidMount () {
-    this.getTheDamnVideo();
     this.keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', this.keyboardDidShow);
     this.keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', this.keyboardDidHide);
   }
