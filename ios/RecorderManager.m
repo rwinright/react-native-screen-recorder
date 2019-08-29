@@ -31,7 +31,10 @@ RCT_EXPORT_METHOD(stop)
   ASScreenRecorder *recorder = [ASScreenRecorder sharedInstance];
   
   if (recorder.isRecording) {
-    [recorder stopRecordingWithCompletion:^{
+//    [recorder stopRecordingWithCompletion:^{
+//      RCTLogInfo(@"Finished recording");
+//    }];
+    [recorder stopRecordingWithCompletion:^(NSURL *url) {
       RCTLogInfo(@"Finished recording");
     }];
   }
