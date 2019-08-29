@@ -8,7 +8,12 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
-typedef void (^VideoCompletionBlock)(void);
+#import <UIKit/UIKit.h>
+
+typedef void (^VideoCompletionBlock)(NSURL *url);
+
+//typedef void (^VideoCompletionBlock)(void);
+
 @protocol ASScreenRecorderDelegate;
 
 @interface ASScreenRecorder : NSObject
@@ -21,11 +26,14 @@ typedef void (^VideoCompletionBlock)(void);
 // this property can not be changed whilst recording is in progress
 @property (strong, nonatomic) NSURL *videoURL;
 
+@property (weak, nonatomic) UIView *viewToCapture;
+@property (assign, nonatomic) BOOL writeToPhotoLibrary;
+
 + (instancetype)sharedInstance;
 - (BOOL)startRecording;
 - (void)stopRecordingWithCompletion:(VideoCompletionBlock)completionBlock;
-@end
 
+@end
 
 // If your view contains an AVCaptureVideoPreviewLayer or an openGL view
 // you'll need to write that data into the CGContextRef yourself.
@@ -35,5 +43,7 @@ typedef void (^VideoCompletionBlock)(void);
 // Then implement 'writeBackgroundFrameInContext:(CGContextRef*)contextRef'
 // use 'CGContextDrawImage' to draw your view into the provided CGContextRef
 @protocol ASScreenRecorderDelegate <NSObject>
+
 - (void)writeBackgroundFrameInContext:(CGContextRef*)contextRef;
+
 @end

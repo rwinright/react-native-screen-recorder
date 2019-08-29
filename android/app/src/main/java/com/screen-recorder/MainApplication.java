@@ -1,11 +1,12 @@
-package com.screenrecorder;
+package com.screen-recorder;
 
 import android.app.Application;
 
 import com.facebook.react.ReactApplication;
-import com.RNFetchBlob.RNFetchBlobPackage;
-import com.rnfs.RNFSPackage;
 import com.brentvatne.react.ReactVideoPackage;
+import com.rnfs.RNFSPackage;
+import com.RNFetchBlob.RNFetchBlobPackage;
+import com.reactnativecommunity.geolocation.GeolocationPackage;
 import com.facebook.react.ReactNativeHost;
 import com.facebook.react.ReactPackage;
 import com.facebook.react.shell.MainReactPackage;
@@ -26,10 +27,10 @@ public class MainApplication extends Application implements ReactApplication {
     protected List<ReactPackage> getPackages() {
       return Arrays.<ReactPackage>asList(
           new MainReactPackage(),
-            new RNFetchBlobPackage(),
+            new ReactVideoPackage(),
             new RNFSPackage(),
-          new ReactVideoPackage(),
-          new RecorderReactPackage()
+            new RNFetchBlobPackage(),
+            new GeolocationPackage()
       );
     }
 
