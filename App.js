@@ -1,5 +1,5 @@
 import React from 'react';
-import { 
+import {
   StyleSheet,
   Text,
   TextInput,
@@ -46,7 +46,7 @@ export default class App extends React.Component {
   play = () => {
     switch (Platform.OS) {
       case 'android':
-        const { androidVideoUrl } = this.state;   
+        const { androidVideoUrl } = this.state;
         if (androidVideoUrl) {
           this.setState({
             videoUri: androidVideoUrl,
@@ -63,6 +63,7 @@ export default class App extends React.Component {
           assetType: 'Videos',
           groupTypes: 'All'
         }).then(r => {
+          console.log(r);
           if (r.edges.length > 0) {
             const ext = 'mp4'
             const appleId = r.edges[0].node.image.uri.substring(5, 41);
@@ -76,14 +77,14 @@ export default class App extends React.Component {
             })
           }
         });
-      break;  
-    
+      break;
+
       default:
         break;
     }
   }
 
-  playEnded = () => {      
+  playEnded = () => {
     this.setState({
       videoUri: null,
       disableStart: false,
@@ -96,7 +97,7 @@ export default class App extends React.Component {
   keyboardDidShow = () => {
     this.setState({keyboardIsShown: true});
   }
-  
+
   keyboardDidHide = () => {
     this.setState({keyboardIsShown: false});
   }
@@ -115,8 +116,8 @@ export default class App extends React.Component {
   componentWillMount() {
     DeviceEventEmitter.addListener('updateFilePath', (filePath) => {
       console.log(filePath);
-      
-      this.setState({androidVideoUrl: filePath});  
+
+      this.setState({androidVideoUrl: filePath});
     });
   }
 
@@ -129,7 +130,7 @@ export default class App extends React.Component {
     this.keyboardDidShowListener.remove();
     this.keyboardDidHideListener.remove();
   }
-  
+
   render() {
     const { videoUri, keyboardIsShown } = this.state;
     return (
@@ -138,13 +139,13 @@ export default class App extends React.Component {
           this.rendernControlBtnGroup()
         }
         <View style={styles.content}>
-          {videoUri && 
+          {videoUri &&
             <VideoPlayer
               source={{ uri: videoUri }}
               onEnd={this.playEnded}
             />
           }
-          {!videoUri && 
+          {!videoUri &&
             <TextInput
               style={styles.textInput}
               multiline

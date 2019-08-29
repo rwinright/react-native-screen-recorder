@@ -44,6 +44,8 @@
 	<string>Need access to photo gallery</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Need access to photo gallery</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Need acces to mic</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>

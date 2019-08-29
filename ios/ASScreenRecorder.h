@@ -8,7 +8,8 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreGraphics/CoreGraphics.h>
-typedef void (^VideoCompletionBlock)(void);
+#import <UIKit/UIKit.h>
+typedef void (^VideoCompletionBlock)(NSURL *url);
 @protocol ASScreenRecorderDelegate;
 
 @interface ASScreenRecorder : NSObject
@@ -20,6 +21,8 @@ typedef void (^VideoCompletionBlock)(void);
 // if saveURL is nil, video will be saved into camera roll
 // this property can not be changed whilst recording is in progress
 @property (strong, nonatomic) NSURL *videoURL;
+
+@property (weak, nonatomic) UIView *viewToCapture;
 
 + (instancetype)sharedInstance;
 - (BOOL)startRecording;
